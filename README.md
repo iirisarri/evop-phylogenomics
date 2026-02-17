@@ -1,1 +1,193 @@
 # evop-phylogenomics
+
+This hands-on course will introduce you to the awesomeness of phylogenomics.
+
+You will learn the most fundamental steps in the phylogenomics pipeline, allowing you to go from a bunch of sequences from different species to a phylogenetic tree that represents how these species are related to each other in evolutionary terms. 
+
+The phylogenomics pipeline can become very complex, many additional steps might be included (particularly at the stage of dataset assembly!) and some analyses can take weeks to complete. Pipelines are modular, meaning they can (and should) be improved and modified to fit the particular data or question at hand. Here, we will cover the basics of a phylogenomic pipeline: identification of homologs, multiple sequence alignment, alignment trimming, and phylogenetic inference with concatenation and coalescent methods.
+
+
+## Objective and data
+
+
+We will use a dataset extracted [from this paper](https://royalsocietypublishing.org/rspb/article/288/1963/20212168/79242/Unexpected-cryptic-species-among-streptophyte). The starting point is a subset of proteins obtained from genomes/transcriptomes for algae and plants. We aim to reconstruct these species' phylogeny using data concatenation and coalescent approaches. In practice, we are using a small subset of the original data to to speed up computations.
+
+Let's start by cloning this repository. The starting data can be found in the `proteomes` folder.
+
+```
+# clone repository, data, and software
+git clone https://github.com/iirisarri/evop-phylogenomics.git
+```
+
+
+## Inferring ortholog groups
+
+To identify homologs among all proteins, we used [OrthoFinder](https://github.com/davidemms/OrthoFinder) with default parameters, just providing the folder containing the proteome files.
+
+```
+orthofinder -f proteomes
+```
+
+Look for Orthofinder's results inside your `vertebrate_proteomes` folder. A bunch of interesting information is contained there. The Orthogroups can be found in `Orthogroup_Sequences`. Each file corresponds to one orthogroup ("gene") containing one sequence per species.
+
+Let's check what the orthogroups look like.
+
+<details>
+  <summary>Need help?</summary>
+  
+```
+e.g. less -S OG0000006.fa
+```
+</details>
+
+You will see that sequences are named `Genus@sequence_name`. To concatenate genes at a later stage, sequences of the same taxa need to have uniform names. Thus, we can homogenize them already now. Can you use bash to remove the bits that differ between different sequences of the same species?
+
+<details>
+  <summary>Need help?</summary>
+  
+```
+for f in *fa; do sed -E '/>/ s/@.+//g' $f > out; mv out $f; done
+# Explanation: in headers (lines starting with ">"), remove "@" and everything afterwards
+```
+</details>
+
+Don't forget to check the output: is your command doing what you want?
+
+
+**NOTE ABOUT ORTHOLOGY**: Ensuring orthology is a difficult issue and often using a tool like Orthofinder might not be enough. Paralogy is a tricky business! Research has shown (e.g. [here](https://www.nature.com/articles/s41559-017-0126) [here](https://academic.oup.com/sysbio/article/71/1/105/6275704?login=false) or [here](https://academic.oup.com/mbe/article/36/6/1344/5418531)) that including paralogs can bias phylogenetic relationships and molecular clock estimates, particularly when the phylogenetic signal is weak. Paralogs should always be removed before phylogenetic inference. But identifying them can be difficult and time-consuming. One could build single-gene trees and look for sequences producing extremely long branches or those that cluster outside of the remaining sequences. [Automatic pipelines](https://github.com/fethalen/phylopypruner) also exist.
+
+
+## Pre-alignment and quality filtering (optional)
+
+
+Often, transcriptomes and genomes have stretches of erroneous, non-homologous amino acids or nucleotides, produced by sequencing errors, assembly errors, or errors in genome annotation. Until recently, these types of errors had been mostly ignored because no automatic tool could deal with them.
+
+We will use [PREQUAL](https://academic.oup.com/bioinformatics/article/34/22/3929/5026659?login=true), a software that takes sets of (homologous) unaligned sequences and identifies sequence stretches (amino acids or codons) sharing no evidence of (residue) homology, which are then masked in the output. Note that homology can be invoked at the level of sequences as well as of residues (amino acids or nucleotides). 
+
+Running PREQUAL for each set orthogroup is easy:
+```sh
+for f in *fa; do prequal $f ; done
+```
+The filtered (masked) alignments are in .filtered, whereas .prequal contains relevant information such as the number of residues filtered.
+
+
+## Multiple sequence alignment
+
+
+The next step is to infer multiple sequence alignments from orthogroups. Multiple sequence alignments allow us to *propose* which amino acids/ nucleotides are homologous. A simple yet accurate tool is [MAFFT](https://mafft.cbrc.jp/alignment/server/).
+
+We will align gene files separately using a for loop:
+
+```
+for f in *filtered; do mafft $f > $f.mafft; done
+```
+
+
+## Alignment trimming
+
+
+Some gene regions (e.g., fast-evolving) are difficult to align and thus positional homology can be uncertain. It is unclear (i.e., problem-specific) whether trimming suspicious regions [improves](https://academic.oup.com/sysbio/article/56/4/564/1682121) or [worsens](https://academic.oup.com/sysbio/article/64/5/778/1685763) tree inference. However, gently trimming very incomplete positions (e.g. with >90% gaps) will speed up computation in the next steps without a significant loss of phylogenetic information.
+
+To trim alignment positions we can use [BMGE](https://gensoft.pasteur.fr/docs/BMGE/1.12/BMGE_doc.pdf) but several other software are also available.
+
+
+```
+for f in *mafft; do java -jar ../software/BMGE.jar -i $f -t AA -of $f.bmge ; done
+
+```
+
+While diving into phylogenomic pipelines, it is always advisable to check a few intermediate results to ensure we are doing what we should be doing. Multiple sequence alignments can be visualized in [SeaView](http://doua.prabi.fr/software/seaview) or [AliView](https://github.com/AliView/AliView). Also, one could have a quick look at alignments using command line tools (`less -S`).
+
+
+## Concatenate alignment
+
+
+To infer our phylogenomic tree we need to concatenate the trimmed single-gene alignments we generated. There are many tools that you can use for this step (e.g [concat_fasta.pl](https://github.com/santiagosnchez/concat_fasta) or [catsequences](https://github.com/ChrisCreevey/catsequences)). Here, we will use [FASconCAT](https://github.com/PatrickKueck/FASconCAT-G), which will read in all `\*.fas` `\*.phy` or `\*.nex` files in the working directory and concatenate them (in random order).
+
+```
+for f in *bmge; do mv $f $f.fas; done
+mkdir concatenation/
+mv *bmge.fas concatenation/
+
+cd concatenation/
+perl ~/Desktop/software/FASconCAT-G_v1.04.pl -l -s
+```
+
+Is your concatenated file what you expected? It should contain 23 taxa and 21 genes. You might check the concatenation (`FcC_supermatrix.fas`) and the file containing the coordinates for gene boundaries (`FcC_supermatrix_partition.txt`). Looking good? Then your concatenated dataset is ready to rock!!
+
+
+
+## Concatenation: Maximum likelihood
+
+
+One of the most common approaches in phylogenomics is gene concatenation: the signal from multiple genes is "pooled" together with the aim of increasing resolution power. This method is best when among-gene discordance is low.
+
+We will use [IQTREE](http://www.iqtree.org/), an efficient and accurate software for maximum likelihood analysis. Another great alternative is [RAxML](https://github.com/stamatak/standard-RAxML). The most simple analysis is to treat the concatenated dataset as a single homogeneous entity. We need to provide the number of threads to use (`-nt 1`) input alignment (`-s`), tell IQTREE to select the best-fit evolutionary model with BIC (`-m TEST -merit BIC -msub nuclear`) and ask for branch support measures such as non-parametric bootstrapping and approximate likelihood ratio test (`-bb 1000 -alrt 1000 -bnni`):
+
+```
+iqtree2 -s FcC_supermatrix.fas -m TEST -msub nuclear -bb 1000 -alrt 1000 -nt AUTO -bnni -pre unpartitioned
+```
+
+A more sophisticated approach would be to perform a partitioned maximum likelihood analysis, where different genes (or other data partitions) are allowed to have different evolutionary models. This should provide a better fit to the data but will increase the number of parameters too. To launch this analysis we need to provide a file containing the coordinates of the partitions (`-p`) and we can ask IQTREE to select the best-fit models for each partition, in this case, according to AICc (more suitable for shorter alignments).
+
+```
+iqtree2 -s FcC_supermatrix.fas -p FcC_supermatrix_partition.txt -m TEST -msub nuclear -merit AICc -bb 1000 -alrt 1000 -nt AUTO -bnni -pre partitioned
+```
+
+Congratulations!! If everything went well, you should get your maximum likelihood estimation of the vertebrate phylogeny (`.treefile`)! Looking into the file you will see a tree in parenthetical (newick) format. See below how to create a graphical representation of your tree.
+
+
+## Coalescence analysis
+
+
+An alternative to concatenation is to use a multispecies coalescent approach. Unlike maximum likelihood, coalescent methods account for incomplete lineage sorting (ILS; an expected outcome of evolving populations). These methods are particularly useful when we expect high levels of ILS, e.g. when speciation events are rapid and leave little time for allele coalescence.
+
+We will use [ASTRAL](https://github.com/smirarab/ASTRAL), a widely used tool that scales up well to phylogenomic datasets. It takes a set of gene trees as input and will generate the coalescent "species tree". ASTRAL assumes that gene trees are estimated without error.
+
+Thus, before running ASTRAL, we will need to estimate individual gene trees. This can be easily done by calling IQTREE in a for loop:
+
+```
+for f in *bmge.fas; do iqtree2  -s $f -m TEST -msub nuclear -merit AICc -nt AUTO; done
+```
+
+After all gene trees are inferred, we should put them all into a single file:
+
+```
+cat *bmge.fas.treefile > my_gene_trees.tre
+```
+
+Now running ASTRAL is trivial, providing the input file with the gene trees and the desired output file name:
+
+```
+java -jar ~/Desktop/software/Astral/astral.5.7.8.jar -i my_gene_trees.tre -o species_tree_ASTRAL.tre 2> out.log
+```
+
+Congratulations!! You just got your coalescent species tree!! Is it different from the concatenated maximum likelihood trees? 
+
+
+## Tree visualization
+
+
+Trees are just text files representing relationships with parentheses; did you see that already? But it is more practical to plot them as a graph, for which we can use tools such as [iTOL](https://itol.embl.de), [FigTree](https://github.com/rambaut/figtree/releases), [TreeViewer](https://treeviewer.org/), [iroki](https://www.iroki.net/), or R (e.g. [ggtree](https://bioconductor.org/packages/release/bioc/html/ggtree.html), [phytools](http://www.phytools.org/); see provided R code).
+
+Upload your trees to iTOL. Trees need to be rooted with an outgroup. Click in the branch of *Callorhinchus milii* and the select "Tree Structure/Reroot the tree here". Branch support values can be shown under the "Advanced" menu. The tree can be modified in many other ways, and finally, a graphical tree can be exported. Similar options are available in FigTree.
+
+[Well done!](https://media.giphy.com/media/wux5AMYo8zHgc/giphy.gif)
+
+
+## Software links
+
+* Orthofinder (https://github.com/davidemms/OrthoFinder)
+* PREQUAL (https://github.com/simonwhelan/prequal)
+* MAFFT (https://mafft.cbrc.jp/alignment/software/source.html)
+* MUSCLE v5 (https://github.com/rcedgar/muscle)
+* TrimAL (https://vicfero.github.io/trimal/)
+* FASTCONCAT (https://github.com/PatrickKueck/FASconCAT-G)
+* IQTREE (http://www.iqtree.org/)
+* Phylobayes (https://github.com/bayesiancook/phylobayes/tree/master)
+* ASTRAL (https://github.com/smirarab/ASTRAL)
+* FIGTree V1.4.4 (https://github.com/rambaut/figtree/releases) 
+* TreeViewer (https://treeviewer.org/)
+* iTOL (https://itol.embl.de/)
+* SeaView (https://doua.prabi.fr/software/seaview_data/seaview5-64.tgz)
+  
