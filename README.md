@@ -22,11 +22,18 @@ git clone https://github.com/iirisarri/evop-phylogenomics.git
 
 ## Inferring ortholog groups
 
-To identify homologs among all proteins, we used [OrthoFinder](https://github.com/davidemms/OrthoFinder) with default parameters, just providing the folder containing the proteome files.
+To identify homologs among all proteins, we will use [OrthoFinder](https://github.com/davidemms/OrthoFinder). Try to figure out the command by yourself by looking at the [online documentation](https://davidemms.github.io/menu/tutorials.html) or by the help provided when typing `orthofinder -h`. 
 
+
+<details>
+  <summary>Need help?</summary>
+  To run OrtoFinder with default parameters, just provide the path to the folder containing the input proteomes.
+  
+  
 ```
 orthofinder -f proteomes
 ```
+</details>
 
 Look for Orthofinder's results inside your `vertebrate_proteomes` folder. A bunch of interesting information is contained there. The Orthogroups can be found in `Orthogroup_Sequences`. Each file corresponds to one orthogroup ("gene") containing one sequence per species.
 
@@ -64,7 +71,7 @@ Often, transcriptomes and genomes have stretches of erroneous, non-homologous am
 
 We will use [PREQUAL](https://academic.oup.com/bioinformatics/article/34/22/3929/5026659?login=true), a software that takes sets of (homologous) unaligned sequences and identifies sequence stretches (amino acids or codons) sharing no evidence of (residue) homology, which are then masked in the output. Note that homology can be invoked at the level of sequences as well as of residues (amino acids or nucleotides). 
 
-Running PREQUAL for each set orthogroup is easy:
+Running PREQUAL for each set orthogroup is easy, if we use a for loop in Bash or the command `parallel`:
 ```sh
 for f in *fa; do prequal $f ; done
 ```
@@ -78,7 +85,7 @@ The next step is to infer multiple sequence alignments from orthogroups. Multipl
 
 We will align gene files separately using a for loop:
 
-```
+```sh
 for f in *filtered; do mafft $f > $f.mafft; done
 ```
 
@@ -86,34 +93,36 @@ for f in *filtered; do mafft $f > $f.mafft; done
 ## Alignment trimming
 
 
-Some gene regions (e.g., fast-evolving) are difficult to align and thus positional homology can be uncertain. It is unclear (i.e., problem-specific) whether trimming suspicious regions [improves](https://academic.oup.com/sysbio/article/56/4/564/1682121) or [worsens](https://academic.oup.com/sysbio/article/64/5/778/1685763) tree inference. However, gently trimming very incomplete positions (e.g. with >90% gaps) will speed up computation in the next steps without a significant loss of phylogenetic information.
+Some gene regions (e.g., fast-evolving) are difficult to align and thus positional homology can be uncertain. It is unclear (i.e., problem-specific) whether trimming suspicious regions [improves](https://academic.oup.com/sysbio/article/56/4/564/1682121) or [worsens](https://academic.oup.com/sysbio/article/64/5/778/1685763) tree inference. However, gently trimming very incomplete positions (e.g. with >95% gaps) will speed up computation in the next steps without a significant loss of phylogenetic information.
 
-To trim alignment positions we can use [BMGE](https://gensoft.pasteur.fr/docs/BMGE/1.12/BMGE_doc.pdf) but several other software are also available.
+To trim alignment positions we can use [ClipKIT]([https://github.com/JLSteenwyk/ClipKIT]) but several other software are also available.
 
 
+```sh
+for f in *mafft; do clipkit -g 0.95 $f -o $f.g95; done
 ```
-for f in *mafft; do java -jar ../software/BMGE.jar -i $f -t AA -of $f.bmge ; done
 
-```
-
-While diving into phylogenomic pipelines, it is always advisable to check a few intermediate results to ensure we are doing what we should be doing. Multiple sequence alignments can be visualized in [SeaView](http://doua.prabi.fr/software/seaview) or [AliView](https://github.com/AliView/AliView). Also, one could have a quick look at alignments using command line tools (`less -S`).
+While diving into phylogenomic pipelines, it is always advisable to check a few intermediate results to ensure we are doing what we should. Multiple sequence alignments can be visualized in [SeaView](http://doua.prabi.fr/software/seaview) or [AliView](https://github.com/AliView/AliView) on your local machine. Also, one could have a quick look at alignments using command line tools (`less -S`).
 
 
 ## Concatenate alignment
 
 
-To infer our phylogenomic tree we need to concatenate the trimmed single-gene alignments we generated. There are many tools that you can use for this step (e.g [concat_fasta.pl](https://github.com/santiagosnchez/concat_fasta) or [catsequences](https://github.com/ChrisCreevey/catsequences)). Here, we will use [FASconCAT](https://github.com/PatrickKueck/FASconCAT-G), which will read in all `\*.fas` `\*.phy` or `\*.nex` files in the working directory and concatenate them (in random order).
+To infer our phylogenomic tree we need to concatenate the trimmed single-gene alignments we generated. There are many tools that you can use for this step (e.g [concat_fasta.pl](https://github.com/santiagosnchez/concat_fasta) or [catsequences](https://github.com/ChrisCreevey/catsequences)). Here, we will use [PhyKIT](https://jlsteenwyk.com/PhyKIT/usage/index.html), which will read (option `-a`) a text file as input that needs to contain the file names of alignments to be concatenated and `-p` will indicate the prefix of the output file. Three output files are generated: a concatenated alignment, a partition file, and an occupancy file. Try to build the command by yourself!
 
+
+<details>
+  <summary>Need help?</summary>
+  
+  
 ```
-for f in *bmge; do mv $f $f.fas; done
-mkdir concatenation/
-mv *bmge.fas concatenation/
-
-cd concatenation/
-perl ~/Desktop/software/FASconCAT-G_v1.04.pl -l -s
+phykit create_concat -a concat_files -p concatenation
 ```
+</details>
 
-Is your concatenated file what you expected? It should contain 23 taxa and 21 genes. You might check the concatenation (`FcC_supermatrix.fas`) and the file containing the coordinates for gene boundaries (`FcC_supermatrix_partition.txt`). Looking good? Then your concatenated dataset is ready to rock!!
+
+
+Is your concatenated file what you expected? It should contain 21 taxa and 108 genes. If that is not the case, you might have forgotten someting on the way. Looking good? Then your concatenated dataset is ready to rock!!
 
 
 
@@ -124,14 +133,14 @@ One of the most common approaches in phylogenomics is gene concatenation: the si
 
 We will use [IQTREE](http://www.iqtree.org/), an efficient and accurate software for maximum likelihood analysis. Another great alternative is [RAxML](https://github.com/stamatak/standard-RAxML). The most simple analysis is to treat the concatenated dataset as a single homogeneous entity. We need to provide the number of threads to use (`-nt 1`) input alignment (`-s`), tell IQTREE to select the best-fit evolutionary model with BIC (`-m TEST -merit BIC -msub nuclear`) and ask for branch support measures such as non-parametric bootstrapping and approximate likelihood ratio test (`-bb 1000 -alrt 1000 -bnni`):
 
-```
-iqtree2 -s FcC_supermatrix.fas -m TEST -msub nuclear -bb 1000 -alrt 1000 -nt AUTO -bnni -pre unpartitioned
+```sh
+iqtree2 -s concatenation.fa -m TEST -msub nuclear -bb 1000 -alrt 1000 -nt AUTO -bnni -pre unpartitioned
 ```
 
 A more sophisticated approach would be to perform a partitioned maximum likelihood analysis, where different genes (or other data partitions) are allowed to have different evolutionary models. This should provide a better fit to the data but will increase the number of parameters too. To launch this analysis we need to provide a file containing the coordinates of the partitions (`-p`) and we can ask IQTREE to select the best-fit models for each partition, in this case, according to AICc (more suitable for shorter alignments).
 
-```
-iqtree2 -s FcC_supermatrix.fas -p FcC_supermatrix_partition.txt -m TEST -msub nuclear -merit AICc -bb 1000 -alrt 1000 -nt AUTO -bnni -pre partitioned
+```sh
+iqtree2 -s concatenation.fa -p FcC_supermatrix_partition.txt -m TEST -msub nuclear -merit AICc -bb 1000 -alrt 1000 -nt AUTO -bnni -pre partitioned
 ```
 
 Congratulations!! If everything went well, you should get your maximum likelihood estimation of the vertebrate phylogeny (`.treefile`)! Looking into the file you will see a tree in parenthetical (newick) format. See below how to create a graphical representation of your tree.
@@ -146,19 +155,19 @@ We will use [ASTRAL](https://github.com/smirarab/ASTRAL), a widely used tool tha
 
 Thus, before running ASTRAL, we will need to estimate individual gene trees. This can be easily done by calling IQTREE in a for loop:
 
-```
-for f in *bmge.fas; do iqtree2  -s $f -m TEST -msub nuclear -merit AICc -nt AUTO; done
+```sh
+for f in *g95; do iqtree2  -s $f -m TEST -msub nuclear -merit AICc -nt AUTO; done
 ```
 
 After all gene trees are inferred, we should put them all into a single file:
 
-```
-cat *bmge.fas.treefile > my_gene_trees.tre
+```sh
+cat *g95.treefile > my_gene_trees.tre
 ```
 
 Now running ASTRAL is trivial, providing the input file with the gene trees and the desired output file name:
 
-```
+```sh
 java -jar ~/Desktop/software/Astral/astral.5.7.8.jar -i my_gene_trees.tre -o species_tree_ASTRAL.tre 2> out.log
 ```
 
@@ -170,9 +179,22 @@ Congratulations!! You just got your coalescent species tree!! Is it different fr
 
 Trees are just text files representing relationships with parentheses; did you see that already? But it is more practical to plot them as a graph, for which we can use tools such as [iTOL](https://itol.embl.de), [FigTree](https://github.com/rambaut/figtree/releases), [TreeViewer](https://treeviewer.org/), [iroki](https://www.iroki.net/), or R (e.g. [ggtree](https://bioconductor.org/packages/release/bioc/html/ggtree.html), [phytools](http://www.phytools.org/); see provided R code).
 
-Upload your trees to iTOL. Trees need to be rooted with an outgroup. Click in the branch of *Callorhinchus milii* and the select "Tree Structure/Reroot the tree here". Branch support values can be shown under the "Advanced" menu. The tree can be modified in many other ways, and finally, a graphical tree can be exported. Similar options are available in FigTree.
+Upload your trees to iTOL. Trees need to be rooted with an outgroup, in this case, at the branch that separates Chlorophyta from Streptophyta. In iToL "Tree Structure/Reroot the tree here". Branch support values can be shown under the "Advanced" menu. The tree can be modified in many other ways, and finally, a graphical tree can be exported. In Figtree, a rooted tree can be saved using File/Export Trees.../"Save as currently displayed".
 
-[Well done!](https://media.giphy.com/media/wux5AMYo8zHgc/giphy.gif)
+[Well done!](https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExdG9mZjBqNXU5Y2xxdnpyMWQ0d3RrM2I2aDZwNmptOGNscHd3NnFtNSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9dg/qjTLsLjcu5PpscKwge/giphy.gif)
+
+## Ancestral character state reconstruction
+
+What can we do with the trees we obtained? So many things!!! The very basics: to investigate how species are related to each other in the green lineage (Chloroplastida), and interpret their evolutionary history.
+
+Something more advanced is to study the evolution of a given trait in the group of interest. Here, we will reconstruct the evolution of multicellularity in the green lineage using [phytools](https://peerj.com/articles/16505/]). In particular, we can use the function `ace` to reconstruct ancestral character states of multicellularity using (a) trait information from extant species at the tips of the phylogeny and (b) the evolutionary history of the group, i.e. the phylogeny, that reflects the evolutionary relationships among the species (topology) and their relative divergences (branch lengths).
+
+Thus, the input files are (a) a text file indicating whether a given species is unicellular (0) or multicellular (1) (`multicellularity.txt`) and (b) one of the phylogenies that you inferred above. Very important: the phylogeny should be properly rooted, in this case at the branch that separates Chlorophyta from Streptophyta. The tree might be rerooted in FigTree and exported in Newick (File/Export Trees.../"Save as currently displayed").
+
+A phytools tutorial for ancestral character state reconstruction under different models is available [here](http://www.phytools.org/Cordoba2017/ex/8/Anc-states-discrete.html). Try to follow the tutorial until you can identify the first multicellular ancestor. If you find difficulties, there might be help somewhere in this repository :-)
+
+Now, a more advanced question: will different trees reconstruct the same evolutionary history for the evolution of multicellularity? Look at Figure 3 of [this paper](https://www.cell.com/current-biology/fulltext/S0960-9822(23)01770-0?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS0960982223017700%3Fshowall%3Dtrue). What do you notice?
+
 
 
 ## Software links
@@ -181,10 +203,9 @@ Upload your trees to iTOL. Trees need to be rooted with an outgroup. Click in th
 * PREQUAL (https://github.com/simonwhelan/prequal)
 * MAFFT (https://mafft.cbrc.jp/alignment/software/source.html)
 * MUSCLE v5 (https://github.com/rcedgar/muscle)
-* TrimAL (https://vicfero.github.io/trimal/)
-* FASTCONCAT (https://github.com/PatrickKueck/FASconCAT-G)
+* ClipKIT (https://github.com/JLSteenwyk/ClipKIT)
+* PhyKIT (https://jlsteenwyk.com/PhyKIT/usage/index.html)
 * IQTREE (http://www.iqtree.org/)
-* Phylobayes (https://github.com/bayesiancook/phylobayes/tree/master)
 * ASTRAL (https://github.com/smirarab/ASTRAL)
 * FIGTree V1.4.4 (https://github.com/rambaut/figtree/releases) 
 * TreeViewer (https://treeviewer.org/)
