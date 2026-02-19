@@ -7,6 +7,7 @@ You will learn the most fundamental steps in the phylogenomics pipeline, allowin
 The phylogenomics pipeline can become very complex, many additional steps might be included (particularly at the stage of dataset assembly!) and some analyses can take weeks to complete. Pipelines are modular, meaning they can (and should) be improved and modified to fit the particular data or question at hand. Here, we will cover the basics of a phylogenomic pipeline: identification of homologs, multiple sequence alignment, alignment trimming, and phylogenetic inference with concatenation and coalescent methods.
 
 
+
 ## Objective and data
 
 
@@ -18,6 +19,7 @@ Let's start by cloning this repository. The starting data can be found in the `p
 # clone repository, data, and software
 git clone https://github.com/iirisarri/evop-phylogenomics.git
 ```
+
 
 
 ## Inferring ortholog groups
@@ -66,6 +68,7 @@ Don't forget to check the output: is your command doing what you want?
 **NOTE ABOUT ORTHOLOGY**: Ensuring orthology is a difficult issue and often using a tool like Orthofinder might not be enough. Paralogy is a tricky business! Research has shown (e.g. [here](https://www.nature.com/articles/s41559-017-0126) [here](https://academic.oup.com/sysbio/article/71/1/105/6275704?login=false) or [here](https://academic.oup.com/mbe/article/36/6/1344/5418531)) that including paralogs can bias phylogenetic relationships and molecular clock estimates, particularly when the phylogenetic signal is weak. Paralogs should always be removed before phylogenetic inference. But identifying them can be difficult and time-consuming. One could build single-gene trees and look for sequences producing extremely long branches or those that cluster outside of the remaining sequences. [Automatic pipelines](https://github.com/fethalen/phylopypruner) also exist.
 
 
+
 ## Pre-alignment and quality filtering (optional)
 
 
@@ -82,6 +85,7 @@ for f in *fa; do prequal $f ; done
 The filtered (masked) alignments are in .filtered, whereas .prequal contains relevant information such as the number of residues filtered.
 
 
+
 ## Multiple sequence alignment
 
 
@@ -92,6 +96,7 @@ We will align gene files separately using a for loop:
 ```sh
 for f in *filtered; do mafft $f > $f.mafft; done
 ```
+
 
 
 ## Alignment trimming
@@ -107,6 +112,7 @@ for f in *mafft; do clipkit -g 0.95 $f -o $f.g95; done
 ```
 
 While diving into phylogenomic pipelines, it is always advisable to check a few intermediate results to ensure we are doing what we should. Multiple sequence alignments can be visualized in [SeaView](http://doua.prabi.fr/software/seaview) or [AliView](https://github.com/AliView/AliView) on your local machine. Also, one could have a quick look at alignments using command line tools (`less -S`).
+
 
 
 ## Concatenate alignment
@@ -150,6 +156,7 @@ iqtree3 -s concatenation.fa -p FcC_supermatrix_partition.txt -m TEST -msub nucle
 Congratulations!! If everything went well, you should get your maximum likelihood estimation of the vertebrate phylogeny (`.treefile`)! Looking into the file you will see a tree in parenthetical (newick) format. See below how to create a graphical representation of your tree.
 
 
+
 ## Coalescence analysis
 
 
@@ -180,6 +187,7 @@ java -jar astral.5.7.8.jar -i my_gene_trees.tre -o species_tree_ASTRAL.tre 2> ou
 Congratulations!! You just got your coalescent species tree!! Is it different from the concatenated maximum likelihood trees? 
 
 
+
 ## Tree visualization
 
 
@@ -188,6 +196,8 @@ Trees are just text files representing relationships with parentheses; did you s
 Upload your trees to iTOL. Trees need to be rooted with an outgroup, in this case, at the branch that separates Chlorophyta from Streptophyta. In iToL "Tree Structure/Reroot the tree here". Branch support values can be shown under the "Advanced" menu. The tree can be modified in many other ways, and finally, a graphical tree can be exported. In Figtree, a rooted tree can be saved using File/Export Trees.../"Save as currently displayed".
 
 [Well done!](https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExdG9mZjBqNXU5Y2xxdnpyMWQ0d3RrM2I2aDZwNmptOGNscHd3NnFtNSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9dg/qjTLsLjcu5PpscKwge/giphy.gif)
+
+
 
 ## Ancestral character state reconstruction
 
@@ -200,6 +210,7 @@ Thus, the input files are (a) a text file indicating whether a given species is 
 A phytools tutorial for ancestral character state reconstruction under different models is available [here](http://www.phytools.org/Cordoba2017/ex/8/Anc-states-discrete.html). Try to follow the tutorial until you can identify the first multicellular ancestor. If you find difficulties, there might be help somewhere in this repository :-)
 
 Now, a more advanced question: will different trees reconstruct the same evolutionary history for the evolution of multicellularity? Look at Figure 3 of [this paper](https://www.cell.com/current-biology/fulltext/S0960-9822(23)01770-0?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS0960982223017700%3Fshowall%3Dtrue). What do you notice?
+
 
 
 
