@@ -37,13 +37,15 @@ orthofinder -f proteomes
 
 Look for Orthofinder's results inside your `vertebrate_proteomes` folder. A bunch of interesting information is contained there. The Orthogroups can be found in `Orthogroup_Sequences`. Each file corresponds to one orthogroup ("gene") containing one sequence per species.
 
-Let's check what the orthogroups look like.
+Let's check what the orthogroups look like. How many sequences does each orthogroup contain? Do you see anything unexpected? In case, remove any orthogroup if it contains more sequences than the total number of taxa.
 
 <details>
   <summary>Need help?</summary>
   
 ```
-e.g. less -S OG0000006.fa
+less -S OG0000006.fa
+
+grep -c ">" *.fa
 ```
 </details>
 
@@ -71,8 +73,10 @@ Often, transcriptomes and genomes have stretches of erroneous, non-homologous am
 
 We will use [PREQUAL](https://academic.oup.com/bioinformatics/article/34/22/3929/5026659?login=true), a software that takes sets of (homologous) unaligned sequences and identifies sequence stretches (amino acids or codons) sharing no evidence of (residue) homology, which are then masked in the output. Note that homology can be invoked at the level of sequences as well as of residues (amino acids or nucleotides). 
 
-Running PREQUAL for each set orthogroup is easy, if we use a for loop in Bash or the command `parallel`:
+Running PREQUAL for each set orthogroup is easy if we use a for loop in Bash or the command `parallel` (you might need to find the path to the program `prequal`):
 ```sh
+parallel 'prequal {}' ::: *fa
+
 for f in *fa; do prequal $f ; done
 ```
 The filtered (masked) alignments are in .filtered, whereas .prequal contains relevant information such as the number of residues filtered.
@@ -134,13 +138,13 @@ One of the most common approaches in phylogenomics is gene concatenation: the si
 We will use [IQTREE](http://www.iqtree.org/), an efficient and accurate software for maximum likelihood analysis. Another great alternative is [RAxML](https://github.com/stamatak/standard-RAxML). The most simple analysis is to treat the concatenated dataset as a single homogeneous entity. We need to provide the number of threads to use (`-nt 1`) input alignment (`-s`), tell IQTREE to select the best-fit evolutionary model with BIC (`-m TEST -merit BIC -msub nuclear`) and ask for branch support measures such as non-parametric bootstrapping and approximate likelihood ratio test (`-bb 1000 -alrt 1000 -bnni`):
 
 ```sh
-iqtree2 -s concatenation.fa -m TEST -msub nuclear -bb 1000 -alrt 1000 -nt AUTO -bnni -pre unpartitioned
+iqtree3 -s concatenation.fa -m TEST -msub nuclear -bb 1000 -alrt 1000 -nt AUTO -bnni -pre unpartitioned
 ```
 
 A more sophisticated approach would be to perform a partitioned maximum likelihood analysis, where different genes (or other data partitions) are allowed to have different evolutionary models. This should provide a better fit to the data but will increase the number of parameters too. To launch this analysis we need to provide a file containing the coordinates of the partitions (`-p`) and we can ask IQTREE to select the best-fit models for each partition, in this case, according to AICc (more suitable for shorter alignments).
 
 ```sh
-iqtree2 -s concatenation.fa -p FcC_supermatrix_partition.txt -m TEST -msub nuclear -merit AICc -bb 1000 -alrt 1000 -nt AUTO -bnni -pre partitioned
+iqtree3 -s concatenation.fa -p FcC_supermatrix_partition.txt -m TEST -msub nuclear -merit AICc -bb 1000 -alrt 1000 -nt AUTO -bnni -pre partitioned
 ```
 
 Congratulations!! If everything went well, you should get your maximum likelihood estimation of the vertebrate phylogeny (`.treefile`)! Looking into the file you will see a tree in parenthetical (newick) format. See below how to create a graphical representation of your tree.
@@ -156,7 +160,9 @@ We will use [ASTRAL](https://github.com/smirarab/ASTRAL), a widely used tool tha
 Thus, before running ASTRAL, we will need to estimate individual gene trees. This can be easily done by calling IQTREE in a for loop:
 
 ```sh
-for f in *g95; do iqtree2  -s $f -m TEST -msub nuclear -merit AICc -nt AUTO; done
+parallel 'iqtree3  -s {} -m TEST -msub nuclear -merit AICc' ::: *g95
+
+for f in *g95; do iqtree3  -s $f -m TEST -msub nuclear -merit AICc -nt AUTO; done
 ```
 
 After all gene trees are inferred, we should put them all into a single file:
@@ -165,10 +171,10 @@ After all gene trees are inferred, we should put them all into a single file:
 cat *g95.treefile > my_gene_trees.tre
 ```
 
-Now running ASTRAL is trivial, providing the input file with the gene trees and the desired output file name:
+Now running ASTRAL is trivial, providing the input file with the gene trees and the desired output file name (you might need to find the path to the program `astral.5.7.8.jar`):
 
 ```sh
-java -jar ~/Desktop/software/Astral/astral.5.7.8.jar -i my_gene_trees.tre -o species_tree_ASTRAL.tre 2> out.log
+java -jar astral.5.7.8.jar -i my_gene_trees.tre -o species_tree_ASTRAL.tre 2> out.log
 ```
 
 Congratulations!! You just got your coalescent species tree!! Is it different from the concatenated maximum likelihood trees? 
