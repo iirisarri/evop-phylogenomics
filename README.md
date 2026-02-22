@@ -37,7 +37,7 @@ orthofinder -f proteomes
 ```
 </details>
 
-Look for Orthofinder's results inside your `vertebrate_proteomes` folder. A bunch of interesting information is contained there. The Orthogroups can be found in `Orthogroup_Sequences`. Each file corresponds to one orthogroup ("gene") containing one sequence per species.
+Look for Orthofinder's results inside your `proteomes` folder. A bunch of interesting information is contained there. The Orthogroups can be found in `Orthogroup_Sequences`. Each file corresponds to one orthogroup ("gene") containing one sequence per species.
 
 Let's check what the orthogroups look like. How many sequences does each orthogroup contain? Do you see anything unexpected? In case, remove any orthogroup if it contains more sequences than the total number of taxa.
 
@@ -153,7 +153,7 @@ A more sophisticated approach would be to perform a partitioned maximum likeliho
 iqtree3 -s concatenation.fa -p FcC_supermatrix_partition.txt -m TEST -msub nuclear -merit AICc -bb 1000 -alrt 1000 -nt AUTO -bnni -pre partitioned
 ```
 
-Congratulations!! If everything went well, you should get your maximum likelihood estimation of the vertebrate phylogeny (`.treefile`)! Looking into the file you will see a tree in parenthetical (newick) format. See below how to create a graphical representation of your tree.
+Congratulations!! If everything went well, you should get your maximum likelihood estimation of the plant phylogeny (`.treefile`)! Looking into the file you will see a tree in parenthetical (newick) format. See below how to create a graphical representation of your tree.
 
 
 
