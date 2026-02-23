@@ -37,15 +37,15 @@ orthofinder -f proteomes
 ```
 </details>
 
-Look for Orthofinder's results inside your `proteomes` folder. A bunch of interesting information is contained there. The Orthogroups can be found in `Orthogroup_Sequences`. Each file corresponds to one orthogroup ("gene") containing one sequence per species.
+Look for Orthofinder's results inside your `proteomes` folder. A bunch of interesting information is contained there. The predicted orthologs can be found in `Single_Copy_Orthologue_Sequences`. Each file should correspond to a set of orthologs containing at most one sequence per species.
 
-Let's check what the orthogroups look like. How many sequences does each orthogroup contain? Do you see anything unexpected? In case, remove any orthogroup if it contains more sequences than the total number of taxa.
+Let's check what the orthologs look like. How many sequences does each orthogroup contain? Do you see anything unexpected?
 
 <details>
   <summary>Need help?</summary>
   
 ```
-less -S OG0000006.fa
+less -S N0.HOG0000035.fa
 
 grep -c ">" *.fa
 ```
@@ -65,7 +65,7 @@ for f in *fa; do sed -E '/>/ s/@.+//g' $f > out; mv out $f; done
 Don't forget to check the output: is your command doing what you want?
 
 
-**NOTE ABOUT ORTHOLOGY**: Ensuring orthology is a difficult issue and often using a tool like Orthofinder might not be enough. Paralogy is a tricky business! Research has shown (e.g. [here](https://www.nature.com/articles/s41559-017-0126) [here](https://academic.oup.com/sysbio/article/71/1/105/6275704?login=false) or [here](https://academic.oup.com/mbe/article/36/6/1344/5418531)) that including paralogs can bias phylogenetic relationships and molecular clock estimates, particularly when the phylogenetic signal is weak. Paralogs should always be removed before phylogenetic inference. But identifying them can be difficult and time-consuming. One could build single-gene trees and look for sequences producing extremely long branches or those that cluster outside of the remaining sequences. [Automatic pipelines](https://github.com/fethalen/phylopypruner) also exist.
+**NOTE ABOUT ORTHOLOGY**: Ensuring orthology is a difficult issue, and often using a tool like Orthofinder might not be enough. Paralogy is a tricky business! Research has shown (e.g. [here](https://www.nature.com/articles/s41559-017-0126) [here](https://academic.oup.com/sysbio/article/71/1/105/6275704?login=false) or [here](https://academic.oup.com/mbe/article/36/6/1344/5418531)) that including paralogs can bias phylogenetic relationships and molecular clock estimates, particularly when the phylogenetic signal is weak. Paralogs should always be removed before phylogenetic inference. But identifying them can be difficult and time-consuming. One could build single-gene trees and look for sequences producing extremely long branches or those that cluster outside of the remaining sequences. [Automatic pipelines](https://github.com/fethalen/phylopypruner) also exist.
 
 
 
